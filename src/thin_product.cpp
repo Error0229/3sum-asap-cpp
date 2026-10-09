@@ -293,24 +293,26 @@ std::vector<std::int64_t> thin_product_entries(const Matrix& X, const Matrix& Y,
     }
     const int L = options.L == 0 ? 19 * m : options.L;
     if (L < m) throw std::invalid_argument("thin_product_entries: L must be at least m = log4(D)");
+    ThinProductStats local;
+    ThinProductStats& st = stats ? *stats : local;
+    st = ThinProductStats{};
+    st.m = m;
+    st.L = L;
+    st.D = D;
+    // Nothing is wanted, so nothing is encoded, however large 10^L is.
+    if (W.empty()) return {};
+
     const u64 leaves_per_encoding = checked_pow(10, L);
     if (leaves_per_encoding > options.max_encoded_values) {
         throw std::length_error("thin_product_entries: an encoding of 10^L numbers exceeds max_encoded_values");
     }
 
     const Layout lay = make_layout(m, L);
-    ThinProductStats local;
-    ThinProductStats& st = stats ? *stats : local;
-    st = ThinProductStats{};
-    st.m = m;
-    st.L = L;
-    st.D = lay.D;
     st.N0 = lay.N0;
     st.K = lay.K;
     st.K0 = lay.K0;
 
     std::vector<std::int64_t> result(W.size());
-    if (W.empty()) return result;
 
     // Locate the tile and the output string of every wanted position (Section 2.4.4).
     struct Wanted {

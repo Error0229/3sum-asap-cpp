@@ -104,6 +104,19 @@ PolyMatrix multiply(const PolyMatrix& A, const PolyMatrix& B) {
     return C;
 }
 
+void check_instance(const ExactTriangleInstance& in) {
+    if (in.w_ac.rows != in.w_ab.rows || in.w_bc.rows != in.w_ab.cols || in.w_bc.cols != in.w_ac.cols) {
+        throw std::invalid_argument("exact_triangle: inconsistent part sizes");
+    }
+    for (const Matrix* M : {&in.w_ab, &in.w_bc, &in.w_ac}) {
+        for (std::int64_t w : M->data) {
+            if (w > kMaxAbsWeight || w < -kMaxAbsWeight) {
+                throw std::out_of_range("exact_triangle: |weight| exceeds kMaxAbsWeight");
+            }
+        }
+    }
+}
+
 std::int64_t triangle_weight(const ExactTriangleInstance& in, std::size_t a, std::size_t b, std::size_t c) {
     return in.w_ab(a, b) + in.w_bc(b, c) + in.w_ac(a, c);
 }
@@ -134,6 +147,7 @@ u64 count_zero_mod_p(const ExactTriangleInstance& in, std::int64_t p) {
 }  // namespace
 
 std::optional<Triangle> exact_triangle_brute_force(const ExactTriangleInstance& in) {
+    check_instance(in);
     for (std::size_t a = 0; a < in.w_ab.rows; ++a) {
         for (std::size_t b = 0; b < in.w_ab.cols; ++b) {
             for (std::size_t c = 0; c < in.w_ac.cols; ++c) {
@@ -146,10 +160,8 @@ std::optional<Triangle> exact_triangle_brute_force(const ExactTriangleInstance& 
 
 std::optional<Triangle> exact_triangle(const ExactTriangleInstance& in, const ExactTriangleOptions& options,
                                        ExactTriangleStats* stats) {
+    check_instance(in);
     const std::size_t nA = in.w_ab.rows, nB = in.w_ab.cols, nC = in.w_ac.cols;
-    if (in.w_ac.rows != nA || in.w_bc.rows != nB || in.w_bc.cols != nC) {
-        throw std::invalid_argument("exact_triangle: inconsistent part sizes");
-    }
     ExactTriangleStats local;
     ExactTriangleStats& st = stats ? *stats : local;
     st = ExactTriangleStats{};

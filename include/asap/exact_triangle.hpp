@@ -12,6 +12,10 @@
 
 namespace asap {
 
+// Edge weights must have absolute value at most this, so that the sum of a triangle's three
+// weights, and every negation and shift of a weight below, fits in an int64_t.
+inline constexpr std::int64_t kMaxAbsWeight = std::int64_t{1} << 61;
+
 // A tripartite graph on parts A, B, C with an integer weight on every edge.
 // w_ab is |A| x |B|, w_bc is |B| x |C|, and w_ac is |A| x |C|. A zero triangle is (a, b, c) with
 // S(a, b, c) = w_ab(a, b) + w_bc(b, c) + w_ac(a, c) = 0. A missing edge can be given a weight
@@ -53,7 +57,8 @@ struct ExactTriangleStats {
     std::uint64_t leaves = 0;     // leaves visited by the thin matrix products
 };
 
-// Finds a zero triangle, or returns nullopt if there is none.
+// Finds a zero triangle, or returns nullopt if there is none. Throws std::out_of_range if a
+// weight exceeds kMaxAbsWeight in absolute value.
 std::optional<Triangle> exact_triangle(const ExactTriangleInstance& instance, const ExactTriangleOptions& options = {},
                                        ExactTriangleStats* stats = nullptr);
 

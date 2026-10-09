@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <optional>
 #include <random>
 #include <stdexcept>
@@ -167,6 +168,28 @@ void test_thin_product() {
         }
         CHECK(threw);
     }
+
+    // An empty request needs no encoding, so even the paper's parameters are fine.
+    {
+        const Matrix X = random_matrix(1, 1, 0, 1);
+        const Matrix Y = random_matrix(1, 1, 0, 1);
+        bool threw = false;
+        std::vector<std::int64_t> got;
+        try {
+            got = asap::thin_product_entries(X, Y, {});
+        } catch (const std::exception&) {
+            threw = true;
+        }
+        CHECK(!threw && got.empty());
+    }
+}
+
+asap::ExactTriangleOptions small_triangle_options(int L) {
+    asap::ExactTriangleOptions opt;
+    opt.D = 16;
+    opt.g = 1;
+    opt.thin.L = L;
+    return opt;
 }
 
 std::int64_t weight(const asap::ExactTriangleInstance& in, std::size_t a, std::size_t b, std::size_t c) {
@@ -228,6 +251,37 @@ void test_exact_triangle() {
         CHECK(st.failed_scans <= count_mod(static_cast<std::int64_t>(st.prime), true));
     }
 
+    // Weights at the limit ±2^61 are handled exactly; weights beyond it, such as INT64_MIN, are rejected.
+    {
+        constexpr std::int64_t big = asap::kMaxAbsWeight;
+        asap::ExactTriangleInstance in = random_triangle_instance(12, 12, 12, big);
+        in.w_ab(3, 5) = big;
+        in.w_bc(5, 7) = -big;
+        in.w_ac(3, 7) = 0;
+        const auto got = asap::exact_triangle(in, small_triangle_options(4));
+        CHECK(got.has_value());
+        if (got) CHECK(weight(in, got->a, got->b, got->c) == 0);
+        CHECK(asap::exact_triangle_brute_force(in).has_value());
+
+        for (const std::int64_t bad : {big + 1, std::numeric_limits<std::int64_t>::min()}) {
+            in.w_bc(0, 0) = bad;
+            bool threw = false;
+            try {
+                asap::exact_triangle(in, small_triangle_options(4));
+            } catch (const std::out_of_range&) {
+                threw = true;
+            }
+            CHECK(threw);
+            threw = false;
+            try {
+                asap::exact_triangle_brute_force(in);
+            } catch (const std::out_of_range&) {
+                threw = true;
+            }
+            CHECK(threw);
+        }
+    }
+
     // With the paper's parameters, D = 16 needs n >= 16^18, so every feasible instance is a base case.
     {
         const asap::ExactTriangleInstance in = random_triangle_instance(10, 10, 10, 5);
@@ -236,14 +290,6 @@ void test_exact_triangle() {
         CHECK(st.brute_force);
         CHECK(got.has_value() == asap::exact_triangle_brute_force(in).has_value());
     }
-}
-
-asap::ExactTriangleOptions small_triangle_options(int L) {
-    asap::ExactTriangleOptions opt;
-    opt.D = 16;
-    opt.g = 1;
-    opt.thin.L = L;
-    return opt;
 }
 
 void test_convolution_three_sum() {
